@@ -122,6 +122,28 @@ class WhatsAppClient:
 
         return base
 
+    def get_templates(self) -> list[dict]:
+        """
+        Fetches all templates and their current real status directly from
+        360dialog — GET /v1/configs/templates, confirmed against their
+        own current documentation. Only implemented for 360dialog mode:
+        direct Meta Graph API uses a different endpoint shape I haven't
+        verified, so this raises clearly rather than guessing at an
+        unconfirmed path.
+        """
+        if self.provider != "360dialog":
+            raise WhatsAppAPIError("get_templates is only implemented for the 360dialog provider.")
+
+        resp = requests.get(
+            f"{self.base_url}/v1/configs/templates",
+            headers=self._headers,
+            params={"limit": 1000},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            raise WhatsAppAPIError(f"Failed to fetch templates: {resp.status_code} {resp.text}")
+        return resp.json().get("waba_templates", [])
+
     def upload_media(self, content: bytes, mime_type: str, filename: str) -> str:
         """
         Uploads a file to the provider so it can be referenced by media_id

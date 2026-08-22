@@ -61,6 +61,21 @@ class MessageTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = MessageTemplateSerializer
     permission_classes = [IsAdminOrAbove]
 
+    @action(detail=False, methods=["post"], url_path="sync")
+    def sync(self, request):
+        """
+        Pulls real status/content from 360dialog for every template,
+        rather than requiring someone to manually check the Hub and
+        re-type what they see. See services/template_sync.py for the
+        actual status-mapping logic and its one real limitation.
+        """
+        from .services.template_sync import sync_templates_from_360dialog
+
+        result = sync_templates_from_360dialog()
+        if result.get("error"):
+            return Response(result, status=502)
+        return Response(result)
+
 
 from .models import Broadcast
 from .serializers import BroadcastRecipientSerializer, BroadcastSerializer

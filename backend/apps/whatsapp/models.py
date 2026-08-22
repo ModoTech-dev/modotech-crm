@@ -23,7 +23,11 @@ class MessageTemplate(models.Model):
     name = models.CharField(max_length=100, unique=True)
     category = models.CharField(max_length=30, default="UTILITY")  # MARKETING | UTILITY | AUTHENTICATION
     language = models.CharField(max_length=10, default="en")
-    body = models.TextField(help_text="Use {{variable_name}} placeholders.")
+    body = models.TextField(
+        help_text="Use {{1}}, {{2}}, etc. as placeholders, in order — this matches "
+        "WhatsApp's own numbered-variable format exactly (not named placeholders), "
+        "since that's what Meta's template system actually requires."
+    )
     status = models.CharField(max_length=20, choices=TemplateStatus.choices, default=TemplateStatus.DRAFT)
     meta_template_id = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

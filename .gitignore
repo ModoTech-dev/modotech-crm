@@ -1,5 +1,25 @@
-backend/.env
-backend/venv/
-frontend/node_modules/
-*.pyc
+# Python
 __pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+*.sqlite3
+
+# Django
+backend/staticfiles/
+backend/media/
+backend/.env
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+docker-compose.override.yml.local

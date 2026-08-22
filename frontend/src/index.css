@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink-950: #0b1220;
+  --color-ink-900: #0f1a2e;
+  --color-ink-800: #16233c;
+  --color-ink-700: #223350;
+  --color-ink-600: #3a4d6e;
+  --color-ink-500: #5c7093;
+  --color-ink-400: #8a9bb8;
+  --color-ink-200: #dbe2ee;
+  --color-ink-100: #eef1f7;
+  --color-ink-50: #f7f9fc;
+
+  --color-signal-600: #0f6e56;
+  --color-signal-500: #14875f;
+  --color-signal-400: #1d9e75;
+  --color-signal-100: #d7f0e6;
+
+  /* Genuine brand blue — distinct from --color-ink-*, which is a muted
+     near-black navy used for text/structure, not a vibrant accent. This
+     is what actually represents the brand's dominant color (blue, with
+     red as secondary — see the Dashboard background treatment). */
+  --color-brand-700: #0d2f6b;
+  --color-brand-600: #1547a3;
+  --color-brand-500: #2563c9;
+  --color-brand-400: #4f86e0;
+  --color-brand-200: #b9d0f5;
+  --color-brand-100: #e3edfc;
+  --color-brand-50: #f2f7fd;
+
+  --color-amber-500: #ba7517;
+  --color-amber-100: #f6e8d2;
+  --color-red-500: #a32d2d;
+  --color-red-100: #f5dcdc;
+  --color-violet-500: #6d4fc2;
+  --color-violet-100: #e6e0f7;
+}
+
+html, body, #root { height: 100%; }
+body {
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+h1, h2, h3, .font-display { font-family: var(--font-display); }
+
+/* Visible keyboard focus everywhere, without the default browser ring
+   fighting our own border/ring styling (design-skill quality floor). */
+:focus-visible {
+  outline: 2px solid var(--color-signal-500);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in { animation: toast-in 0.18s ease-out; }
+
+/* Login page ambient circuit animation — a light pulse "traveling" along
+   each trace (dash pattern offsetting), and a slow breathing pulse on
+   each node, echoing the logo's own circuit-node motif. */
+@keyframes circuit-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -600; }
+}
+.circuit-flow {
+  animation: circuit-flow 7s linear infinite;
+}
+@keyframes circuit-node-pulse {
+  0%, 100% { opacity: 0.4; r: 3.5; }
+  50% { opacity: 1; r: 5; }
+}
+.circuit-node {
+  animation: circuit-node-pulse 3.2s ease-in-out infinite;
+  transform-origin: center;
+}

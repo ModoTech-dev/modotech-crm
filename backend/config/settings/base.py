@@ -182,6 +182,12 @@ WHATSAPP_PROVIDER = config("WHATSAPP_PROVIDER", default="meta")
 # Meta App Secret above) used to verify the x-360dialog-signature header
 # on inbound webhooks. Only relevant when WHATSAPP_PROVIDER=360dialog.
 WHATSAPP_WEBHOOK_SECRET = config("WHATSAPP_WEBHOOK_SECRET", default="")
+# Deliberate, explicit opt-out of webhook signature verification — see
+# the long comment in apps/whatsapp/services/webhook_security.py for
+# why this exists and what the real tradeoff is. Only set this to False
+# after confirming with 360dialog support that Platform Secret genuinely
+# isn't available for your account type. Defaults to True (secure).
+WHATSAPP_REQUIRE_WEBHOOK_SIGNATURE = config("WHATSAPP_REQUIRE_WEBHOOK_SIGNATURE", default=True, cast=bool)
 
 # Filters out pre-go-live message history that WhatsApp Coexistence syncs
 # in when a number is first connected — see apps/whatsapp/tasks.py for

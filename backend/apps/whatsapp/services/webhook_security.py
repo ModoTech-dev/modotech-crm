@@ -39,12 +39,28 @@ def _verify_meta(raw_body: bytes, signature_header: str | None) -> bool:
 
 
 def _verify_360dialog(raw_body: bytes, signature_header: str | None) -> bool:
+    # Deliberate, explicit opt-out — set only after confirming with
+    # 360dialog support that Platform Secret genuinely isn't available
+    # for this account type (it appears to be Partner Hub-only, not
+    # available to regular Client accounts, based on their own docs).
+    # This is a real security tradeoff, made knowingly: without a
+    # shared secret, there's no cryptographic proof a webhook actually
+    # came from 360dialog. The practical exposure is limited (an
+    # attacker would need to specifically discover this exact URL, and
+    # could only inject fake conversation data, not access real
+    # customer data or send real messages) — but it is a real gap, and
+    # this flag exists so that gap is visible in the codebase, not
+    # silently accepted.
+    if not getattr(settings, "WHATSAPP_REQUIRE_WEBHOOK_SIGNATURE", True):
+        return True
+
     webhook_secret = getattr(settings, "WHATSAPP_WEBHOOK_SECRET", "")
 
     if not webhook_secret:
         # You likely haven't generated a 360dialog Platform Secret yet —
         # see docs.360dialog.com "Generate Platform Secret". Accept in
         # DEBUG so local/dev testing isn't blocked, but this must be set
+        # (or WHATSAPP_REQUIRE_WEBHOOK_SIGNATURE explicitly disabled)
         # before going to production, same as the Meta path above.
         return settings.DEBUG
 

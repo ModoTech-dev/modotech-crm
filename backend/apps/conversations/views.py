@@ -64,6 +64,22 @@ def friendly_whatsapp_error(exc: WhatsAppAPIError) -> str:
     return f"WhatsApp couldn't deliver this message: {exc}"
 
 
+def agent_initials(user) -> str:
+    """
+    "Gloria Wanjiru" -> "GW" — appended to an agent's own text replies so
+    customers can tell which staff member they're actually talking to,
+    since a conversation may be handled by different agents over time.
+    Deliberately only used for genuine free-form text replies, never
+    template messages: a template's content is fixed and Meta-approved
+    exactly as submitted, and appending anything to it would mean the
+    outgoing message no longer matches what was approved.
+    """
+    first = (user.first_name or "").strip()
+    last = (user.last_name or "").strip()
+    initials = f"{first[:1]}{last[:1]}".upper()
+    return initials
+
+
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.select_related("customer", "assigned_agent").prefetch_related("tags")
     filterset_fields = ["status", "priority", "department", "assigned_agent"]
@@ -261,11 +277,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 "name": data.get("location_name"),
                 "address": data.get("location_address"),
             }
+
+        outgoing_content = data["content"]
+        # Only append to genuine free-form text — never to a template
+        # send (fixed, Meta-approved content), only for regular staff
+        # (not Admin/Super Admin — management-tier sends don't get this),
+        # and only when we actually have real initials to add, so a
+        # staff member with no name set doesn't get a stray sign-off.
+        if data["message_type"] == "TEXT" and not data.get("template_name") and not request.user.is_admin_tier:
+            initials = agent_initials(request.user)
+            if initials:
+                outgoing_content = f"{data['content']}\nRegards - {initials}"
+
         try:
             wamid = client.send_message(
                 to=conversation.customer.whatsapp_number,
                 message_type=data["message_type"],
-                content=data["content"],
+                content=outgoing_content,
                 template_name=data.get("template_name"),
                 template_variables=data.get("template_variables"),
                 media_path=data.get("media_path"),
@@ -288,8 +316,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
             # For a location share, content holds a human-readable fallback
             # (used in list previews/search) while the actual coordinates
             # live in metadata, where MessageSerializer/MessageBubble read
-            # them from for rendering an actual map link.
-            content=data.get("location_name") or "Location" if location else data["content"],
+            # them from for rendering an actual map link. Otherwise, store
+            # exactly what was actually sent (including the initials, if
+            # added above) so the CRM's own record matches reality.
+            content=data.get("location_name") or "Location" if location else outgoing_content,
             media_path=data.get("media_path", ""),
             metadata=location or {},
             status="SENT",

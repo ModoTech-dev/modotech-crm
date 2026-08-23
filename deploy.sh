@@ -37,6 +37,11 @@ docker compose build --no-cache backend celery_worker celery_beat frontend
 echo "==> Starting/replacing containers..."
 docker compose up -d
 
+echo "==> Restarting nginx too, even though its image didn't change — backend just got a new"
+echo "    internal address, and nginx won't notice that on its own until its DNS cache expires."
+echo "    This is exactly the gap that's caused login failures right after past deploys."
+docker compose restart nginx
+
 echo "==> Waiting for backend to become healthy (internal check)..."
 for i in $(seq 1 30); do
     if docker compose exec -T backend python manage.py check >/dev/null 2>&1; then
@@ -64,9 +69,24 @@ if [ "$HTTP_STATUS" != "200" ]; then
     echo "this exact gap is what caused real problems during initial deployment. Investigate before"
     echo "considering this deploy successful. Rollback images are tagged ':previous' if needed:"
     echo "  docker tag modotech-crm-backend:previous modotech-crm-backend:latest && docker compose up -d"
-else
-    echo "    $SITE_URL responded 200 OK — real, end-to-end confirmation, not just an internal check."
+    exit 1
 fi
+echo "    $SITE_URL responded 200 OK."
+
+echo "==> Verifying the API path specifically - the homepage check above is served by the"
+echo "    frontend and wouldn't catch a stale nginx->backend connection, which is exactly what"
+echo "    caused login failures right after past deploys. This tests the actual backend path."
+API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SITE_URL/api/auth/login/" -H "Content-Type: application/json" -d '{}' || echo "000")
+if [ "$API_STATUS" != "400" ]; then
+    # 400 (bad request - empty credentials) is the CORRECT response here,
+    # confirming the request actually reached Django. Anything else
+    # (502, 000, 500) means the backend path itself is still broken.
+    echo "WARNING: $SITE_URL/api/auth/login/ returned $API_STATUS, expected 400 (empty credentials"
+    echo "correctly rejected). This means requests aren't reaching the backend correctly, even"
+    echo "though the homepage loaded fine. Try: docker compose restart nginx"
+    exit 1
+fi
+echo "    API path responded correctly - confirmed reaching the real backend, not stale/cached."
 
 echo "==> Current container status:"
 docker compose ps

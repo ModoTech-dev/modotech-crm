@@ -15,5 +15,15 @@ def save_media(filename: str, content: bytes) -> str:
     return path
 
 
+def save_internal_attachment(filename: str, content: bytes) -> str:
+    """Same storage backend as WhatsApp media, kept in its own folder
+    since these are files staff share with each other internally, not
+    anything ever sent to a customer."""
+    from django.core.files.base import ContentFile
+
+    path = default_storage.save(f"internal_attachments/{filename}", ContentFile(content))
+    return path
+
+
 def media_url(path: str) -> str:
     return default_storage.url(path)

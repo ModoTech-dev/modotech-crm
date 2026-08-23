@@ -42,6 +42,38 @@ export interface Customer {
   open_conversation_count: number
 }
 
+export interface InternalMessage {
+  id: string
+  sender: string
+  sender_name: string | null
+  recipient: string
+  recipient_name: string | null
+  content: string
+  referenced_customer: string | null
+  referenced_customer_name: string | null
+  referenced_customer_number: string | null
+  file_url: string | null
+  file_name: string
+  file_mime_type: string
+  broadcast_id: string | null
+  created_at: string
+  read_at: string | null
+}
+
+export interface MessageThread {
+  user_id: string
+  user_name: string
+  last_message: string
+  last_message_at: string
+  unread_count: number
+}
+
+export interface Colleague {
+  id: string
+  name: string
+  role: Role
+}
+
 export type ConversationStatus = 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED'
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
 

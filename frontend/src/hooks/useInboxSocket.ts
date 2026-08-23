@@ -3,7 +3,7 @@ import { tokenStore } from '../api/client'
 
 export interface InboxEvent {
   type: 'conversation.event'
-  event: 'new_message' | 'conversation_created' | 'conversation_updated' | 'conversation_assigned' | 'notification'
+  event: 'new_message' | 'conversation_created' | 'conversation_updated' | 'conversation_assigned' | 'notification' | 'internal_message'
   conversation_id?: string
   [key: string]: unknown
 }

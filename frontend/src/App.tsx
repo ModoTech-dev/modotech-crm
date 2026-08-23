@@ -6,6 +6,7 @@ import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { InboxPage } from './pages/InboxPage'
+import { MessagesPage } from './pages/MessagesPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { AgentsPage } from './pages/AgentsPage'
@@ -30,6 +31,7 @@ export default function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route path="/leads" element={<CustomersPage statusFilter="LEAD" title="Leads" />} />
             <Route path="/broadcasts" element={<BroadcastsPage />} />

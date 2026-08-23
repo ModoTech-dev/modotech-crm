@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Inbox, Users, UserPlus, Megaphone, FileText,
-  BarChart3, UserCog, Building2, Settings, LogOut, Wifi, Search, X,
+  BarChart3, UserCog, Building2, Settings, LogOut, Wifi, Search, X, MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Avatar } from './Avatar'
@@ -27,6 +27,7 @@ function roleTier(role?: Role): number {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', end: true, icon: LayoutDashboard, minTier: 0 },
   { to: '/inbox', label: 'Inbox', icon: Inbox, minTier: 0 },
+  { to: '/messages', label: 'Messages', icon: MessageCircle, minTier: 0 },
   { to: '/customers', label: 'Customers', icon: Users, minTier: 0 },
   { to: '/leads', label: 'Leads', icon: UserPlus, minTier: 0 },
   { to: '/reports', label: 'Reports', icon: BarChart3, minTier: 1 },

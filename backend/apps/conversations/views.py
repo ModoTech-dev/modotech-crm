@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import MultiPartParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,12 +12,13 @@ from apps.accounts.models import User
 from apps.integrations.services.audit import log_action
 from apps.integrations.services.storage import save_media
 from apps.whatsapp.services.meta_client import WhatsAppAPIError, get_whatsapp_client
-from .models import Conversation, ConversationAssignment, InternalNote, Message
+from .models import Conversation, ConversationAssignment, InternalMessage, InternalNote, Message
 from .serializers import (
     AssignConversationSerializer,
     ConversationAssignmentSerializer,
     ConversationDetailSerializer,
     ConversationListSerializer,
+    InternalMessageSerializer,
     InternalNoteSerializer,
     MessageSerializer,
     SendMessageSerializer,
@@ -462,6 +463,150 @@ class ParseMapsLinkView(APIView):
                 "url": "Couldn't find a location in that link. Try copying it directly from Google Maps' own Share button.",
             })
         return Response(result)
+
+
+class InternalMessageViewSet(viewsets.GenericViewSet):
+    """
+    Staff-to-staff messaging, separate entirely from customer WhatsApp
+    conversations. `threads` mirrors how the customer Inbox groups by
+    conversation partner, so this should feel immediately familiar to
+    anyone already using the rest of the CRM.
+    """
+
+    serializer_class = InternalMessageSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, JSONParser]
+
+    def get_queryset(self):
+        user = self.request.user
+        return InternalMessage.objects.filter(
+            Q(sender=user) | Q(recipient=user)
+        ).select_related("sender", "recipient", "referenced_customer")
+
+    @action(detail=False, methods=["get"])
+    def colleagues(self, request):
+        """Every other active staff member — the directory used to
+        start a NEW conversation, distinct from `threads` below (which
+        only shows people you've already exchanged messages with)."""
+        colleagues = User.objects.filter(is_active=True).exclude(id=request.user.id).order_by("first_name", "email")
+        return Response([
+            {"id": str(u.id), "name": u.get_full_name() or u.email, "role": u.role}
+            for u in colleagues
+        ])
+
+    @action(detail=False, methods=["get"])
+    def threads(self, request):
+        """One row per colleague you've exchanged messages with, newest
+        first, with an unread count — small dataset (staff, not
+        customers), so grouping in Python here is simple and plenty
+        fast rather than needing a more complex aggregate query."""
+        user = request.user
+        messages = self.get_queryset().order_by("-created_at")
+
+        grouped: dict[str, dict] = {}
+        for msg in messages:
+            other = msg.recipient if msg.sender_id == user.id else msg.sender
+            key = str(other.id)
+            if key not in grouped:
+                grouped[key] = {
+                    "user_id": key,
+                    "user_name": other.get_full_name() or other.email,
+                    "last_message": msg.content,
+                    "last_message_at": msg.created_at,
+                    "unread_count": 0,
+                }
+            if msg.recipient_id == user.id and msg.read_at is None:
+                grouped[key]["unread_count"] += 1
+
+        return Response(sorted(grouped.values(), key=lambda t: t["last_message_at"], reverse=True))
+
+    @action(detail=False, methods=["get"], url_path="with-user/(?P<user_id>[^/.]+)")
+    def with_user(self, request, user_id=None):
+        """Full history with one specific colleague, oldest first —
+        marks their messages to you as read as a side effect of opening
+        it, the same way opening a customer conversation does."""
+        messages = self.get_queryset().filter(
+            Q(sender_id=user_id, recipient=request.user) | Q(sender=request.user, recipient_id=user_id)
+        ).order_by("created_at")
+
+        InternalMessage.objects.filter(
+            sender_id=user_id, recipient=request.user, read_at__isnull=True
+        ).update(read_at=timezone.now())
+
+        return Response(InternalMessageSerializer(messages, many=True, context={"request": request}).data)
+
+    def create(self, request):
+        """Send a direct message to one specific colleague, optionally
+        referencing a customer conversation and/or attaching a file —
+        a message can be just a file with no caption, so content alone
+        isn't required as long as a file is present."""
+        recipient_id = request.data.get("recipient")
+        content = (request.data.get("content") or "").strip()
+        uploaded_file = request.FILES.get("file")
+
+        if not recipient_id or (not content and not uploaded_file):
+            raise ValidationError({"detail": "recipient is required, and either content or a file must be provided."})
+
+        recipient = generics.get_object_or_404(User, id=recipient_id, is_active=True)
+        referenced_customer_id = request.data.get("referenced_customer")
+        referenced_customer = None
+        if referenced_customer_id:
+            # Same visibility scoping CustomerViewSet uses everywhere
+            # else — you can only reference a customer you could already
+            # see, so this never becomes a way to leak access to a
+            # colleague's assigned customer that isn't yours.
+            customer_qs = Customer.objects.all()
+            if not request.user.is_admin_tier:
+                customer_qs = customer_qs.filter(conversations__assigned_agent=request.user).distinct()
+            referenced_customer = generics.get_object_or_404(customer_qs, id=referenced_customer_id)
+
+        file_path, file_name, file_mime_type = "", "", ""
+        if uploaded_file:
+            if uploaded_file.size > MAX_MEDIA_UPLOAD_SIZE:
+                raise ValidationError({"file": f"File is too large (max {MAX_MEDIA_UPLOAD_SIZE // (1024 * 1024)}MB)."})
+            from apps.integrations.services.storage import save_internal_attachment
+            import uuid as uuid_module
+
+            file_path = save_internal_attachment(f"{uuid_module.uuid4()}_{uploaded_file.name}", uploaded_file.read())
+            file_name = uploaded_file.name
+            file_mime_type = uploaded_file.content_type or ""
+
+        message = InternalMessage.objects.create(
+            sender=request.user, recipient=recipient, content=content, referenced_customer=referenced_customer,
+            file_path=file_path, file_name=file_name, file_mime_type=file_mime_type,
+        )
+        data = InternalMessageSerializer(message, context={"request": request}).data
+        notify_agent(recipient.id, {"event": "internal_message", "message": data})
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"])
+    def broadcast(self, request):
+        """Super Admin only — sends the same message to every other
+        active user at once. Implemented as one row per recipient (not
+        one shared record) so each person's read-status is tracked
+        correctly, rather than one row trying to represent "read by
+        some, not others.\""""
+        if request.user.role != "SUPER_ADMIN":
+            raise PermissionDenied("Only Super Admin can message everyone at once.")
+
+        content = (request.data.get("content") or "").strip()
+        if not content:
+            raise ValidationError({"detail": "content is required."})
+
+        import uuid as uuid_module
+        broadcast_id = uuid_module.uuid4()
+        recipients = User.objects.filter(is_active=True).exclude(id=request.user.id)
+
+        created = []
+        for recipient in recipients:
+            message = InternalMessage.objects.create(
+                sender=request.user, recipient=recipient, content=content, broadcast_id=broadcast_id,
+            )
+            data = InternalMessageSerializer(message, context={"request": request}).data
+            notify_agent(recipient.id, {"event": "internal_message", "message": data})
+            created.append(data)
+
+        return Response({"broadcast_id": str(broadcast_id), "recipient_count": len(created)}, status=status.HTTP_201_CREATED)
 
 
 def models_q_agent_scope(user):

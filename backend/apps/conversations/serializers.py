@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.accounts.serializers import UserSerializer
 from apps.customers.serializers import CustomerSerializer, TagSerializer
-from .models import Conversation, ConversationAssignment, InternalNote, Message
+from .models import Conversation, ConversationAssignment, InternalMessage, InternalNote, Message
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -34,6 +34,42 @@ class MessageSerializer(serializers.ModelSerializer):
             # purposes, it just isn't served to the frontend once deleted.
             data["content"] = ""
         return data
+
+
+class InternalMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source="sender.get_full_name", read_only=True, default=None)
+    recipient_name = serializers.CharField(source="recipient.get_full_name", read_only=True, default=None)
+    # Deliberately minimal, not the full CustomerSerializer — this is a
+    # lightweight reference for display in a chat bubble, not a data
+    # export. Actually opening the conversation still goes through the
+    # normal Customer/Conversation access checks, unaffected by this.
+    referenced_customer_name = serializers.CharField(source="referenced_customer.name", read_only=True, default=None)
+    referenced_customer_number = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InternalMessage
+        fields = [
+            "id", "sender", "sender_name", "recipient", "recipient_name", "content",
+            "referenced_customer", "referenced_customer_name", "referenced_customer_number",
+            "file_url", "file_name", "file_mime_type",
+            "broadcast_id", "created_at", "read_at",
+        ]
+        read_only_fields = ["id", "sender", "sender_name", "recipient_name", "broadcast_id", "created_at", "read_at", "file_url"]
+
+    def get_referenced_customer_number(self, obj):
+        if not obj.referenced_customer_id:
+            return None
+        from apps.customers.services.phone_masking import visible_number
+
+        return visible_number(obj.referenced_customer.whatsapp_number, self.context.get("request"))
+
+    def get_file_url(self, obj):
+        if not obj.file_path:
+            return None
+        from apps.integrations.services.storage import media_url
+
+        return media_url(obj.file_path)
 
 
 class InternalNoteSerializer(serializers.ModelSerializer):

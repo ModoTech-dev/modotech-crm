@@ -184,3 +184,49 @@ class InternalNote(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class InternalMessage(models.Model):
+    """
+    Staff-to-staff messaging — entirely separate from customer-facing
+    WhatsApp conversations, but able to REFERENCE one via
+    referenced_customer, so a colleague can point at "this specific
+    client's chat" without pasting a raw link.
+
+    A "message everyone" broadcast (Super Admin only) is implemented as
+    one row per recipient, not a single shared record — this is
+    deliberate: it means read-status is tracked per person correctly,
+    rather than needing to represent "read by some, not others" on one
+    ambiguous row. broadcast_id ties the fan-out copies back together
+    for anything that later wants to treat them as one event (e.g. a
+    "sent to everyone" label, or a future read-count summary).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_internal_messages"
+    )
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="received_internal_messages"
+    )
+    content = models.TextField(blank=True)  # blank allowed — a message can be just a file, no caption
+    file_path = models.CharField(max_length=500, blank=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    file_mime_type = models.CharField(max_length=100, blank=True)
+    # Deliberately just a reference, not a data copy — clicking through
+    # to the actual conversation still goes through Customer/Conversation
+    # access checks exactly as normal, so referencing a customer here
+    # never bypasses the visibility scoping built for the Customers tab.
+    referenced_customer = models.ForeignKey(
+        Customer, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    broadcast_id = models.UUIDField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["sender", "recipient"]),
+            models.Index(fields=["recipient", "read_at"]),
+        ]

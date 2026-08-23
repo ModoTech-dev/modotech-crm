@@ -135,7 +135,7 @@ export function TemplatesPage() {
         {templates && templates.length === 0 ? (
           <EmptyState icon={FileText} title="No templates yet" description="Create a template above — you'll need it approved in Meta before sending broadcasts." />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-ink-100 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-ink-100 bg-white">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-ink-100 bg-ink-50 text-xs uppercase tracking-wide text-ink-500">
                 <tr>

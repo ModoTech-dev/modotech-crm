@@ -76,7 +76,7 @@ export function AgentsPage() {
             {users && users.length === 0 ? (
               <EmptyState icon={UserCog} title="No agents yet" description="Create your first agent account to start assigning conversations." />
             ) : (
-              <div className="overflow-hidden rounded-lg border border-ink-100 bg-white">
+              <div className="overflow-x-auto rounded-lg border border-ink-100 bg-white">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-ink-100 bg-ink-50 text-xs uppercase tracking-wide text-ink-500">
                     <tr>

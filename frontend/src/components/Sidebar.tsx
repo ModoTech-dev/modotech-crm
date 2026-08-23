@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
 import {
   LayoutDashboard, Inbox, Users, UserPlus, Megaphone, FileText,
-  BarChart3, UserCog, Building2, Settings, LogOut, Wifi, Search,
+  BarChart3, UserCog, Building2, Settings, LogOut, Wifi, Search, X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { Avatar } from './Avatar'
@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { to: '/departments', label: 'Departments', icon: Building2, minTier: 3 },
 ]
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) {
   const { user, logout } = useAuth()
   const tier = roleTier(user?.role)
   const visibleItems = NAV_ITEMS.filter((item) => tier >= item.minTier)
@@ -45,12 +45,33 @@ export function Sidebar() {
 
   return (
     <>
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-ink-800 bg-ink-950 text-ink-100">
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-signal-600 text-white">
-          <Wifi size={16} strokeWidth={2.5} />
+    {/* Dark overlay behind the drawer on mobile — tapping it closes the
+        menu, matching the standard mobile pattern. Desktop never shows
+        this, since the sidebar is always visible there already. */}
+    {mobileOpen && (
+      <div className="fixed inset-0 z-30 bg-ink-950/50 md:hidden" onClick={onMobileClose} />
+    )}
+
+    <aside
+      className={clsx(
+        'fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col border-r border-ink-800 bg-ink-950 text-ink-100 transition-transform duration-200 md:relative md:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 px-5 py-5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-signal-600 text-white">
+            <Wifi size={16} strokeWidth={2.5} />
+          </div>
+          <div className="font-display text-sm font-semibold tracking-wide">Modotech CRM</div>
         </div>
-        <div className="font-display text-sm font-semibold tracking-wide">Modotech CRM</div>
+        <button
+          onClick={onMobileClose}
+          className="rounded-md p-1 text-ink-400 hover:bg-ink-900 hover:text-white md:hidden"
+          aria-label="Close menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <div className="px-3 pb-2">
@@ -63,12 +84,13 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
         {visibleItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
+            onClick={onMobileClose}
             className={({ isActive }) =>
               clsx(
                 'group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors',

@@ -83,14 +83,14 @@ export function CustomersPage({ statusFilter, title = 'Customers' }: { statusFil
       <Header
         title={title}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-72">
               <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, phone, account number…"
-                className="w-72 rounded-md border border-ink-200 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-signal-500 focus:ring-2 focus:ring-signal-500/20"
+                className="w-full rounded-md border border-ink-200 py-1.5 pl-8 pr-3 text-sm outline-none focus:border-signal-500 focus:ring-2 focus:ring-signal-500/20"
               />
             </div>
             {isAdminTier && (
@@ -120,7 +120,7 @@ export function CustomersPage({ statusFilter, title = 'Customers' }: { statusFil
             description={query ? 'Try a different name, phone number, or account number.' : 'Customers appear here as soon as they message your WhatsApp number, or you can add one directly.'}
           />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-ink-100 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-ink-100 bg-white">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-ink-100 bg-ink-50 text-xs uppercase tracking-wide text-ink-500">
                 <tr>

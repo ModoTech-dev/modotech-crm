@@ -21,7 +21,7 @@ export function CustomerPanel({ customer }: { customer: Customer | null }) {
 
   if (!customer) {
     return (
-      <div className="flex w-72 shrink-0 flex-col items-center justify-center gap-2 border-l border-ink-100 bg-white p-4 text-center">
+      <div className="flex w-full shrink-0 flex-col items-center justify-center gap-2 border-ink-100 p-4 text-center md:w-72 md:border-l">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-50 text-ink-400">
           <Users size={18} strokeWidth={1.75} />
         </div>
@@ -31,7 +31,7 @@ export function CustomerPanel({ customer }: { customer: Customer | null }) {
   }
 
   return (
-    <div className="w-72 shrink-0 overflow-y-auto border-l border-ink-100 bg-white p-4">
+    <div className="w-full shrink-0 overflow-y-auto border-ink-100 bg-white p-4 md:w-72 md:border-l">
       <div className="mb-3 flex items-center gap-3">
         <Avatar name={customer.name || customer.whatsapp_number} size="md" />
         <div className="min-w-0">

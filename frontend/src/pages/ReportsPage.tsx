@@ -84,7 +84,7 @@ export function ReportsPage() {
         ) : agents && agents.length === 0 ? (
           <EmptyState icon={BarChart3} title="No agents yet" description="Performance data will appear once agents start handling conversations." />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-ink-100 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-ink-100 bg-white">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-ink-100 bg-ink-50 text-xs uppercase tracking-wide text-ink-500">
                 <tr>

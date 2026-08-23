@@ -84,7 +84,7 @@ export function DashboardPage() {
         {!activityForbidden && (
           <div className="mt-8">
             <div className="mb-3 font-display text-sm font-semibold text-ink-900">Recent activity</div>
-            <div className="overflow-hidden rounded-lg border border-ink-100 bg-white">
+            <div className="overflow-x-auto rounded-lg border border-ink-100 bg-white">
               {!activity ? (
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 4 }).map((_, i) => (

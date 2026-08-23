@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquareText, Inbox as InboxIcon, UserPlus, Lock } from 'lucide-react'
+import { MessageSquareText, Inbox as InboxIcon, UserPlus, Lock, ChevronLeft, Info, X } from 'lucide-react'
 import { api } from '../api/client'
 import { Header } from '../components/Header'
 import { ConversationListItem } from '../components/ConversationListItem'
@@ -24,6 +24,7 @@ export function InboxPage() {
   const [detail, setDetail] = useState<ConversationDetail | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [showNewContact, setShowNewContact] = useState(false)
+  const [showCustomerPanelMobile, setShowCustomerPanelMobile] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -145,7 +146,13 @@ export function InboxPage() {
         }
       />
       <div className="flex min-h-0 flex-1">
-        <div className="w-80 shrink-0 overflow-y-auto border-r border-ink-100 bg-white">
+        {/* Conversation list — full width on mobile when nothing's
+            selected yet, hidden on mobile once a chat is open (replaced
+            by the chat view below). Always visible, fixed-width, on
+            desktop regardless of selection. */}
+        <div
+          className={`${activeId ? 'hidden md:block' : 'block'} w-full shrink-0 overflow-y-auto border-r border-ink-100 bg-white md:w-80`}
+        >
           {conversations === null ? (
             <div className="space-y-4 p-4">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -178,7 +185,10 @@ export function InboxPage() {
           )}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col bg-ink-50">
+        {/* Active chat — hidden on mobile until a conversation is
+            selected, then takes the full screen with a back button to
+            return to the list. Always visible on desktop. */}
+        <div className={`${activeId ? 'flex' : 'hidden md:flex'} min-w-0 flex-1 flex-col bg-ink-50`}>
           {!detail ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -190,9 +200,16 @@ export function InboxPage() {
           ) : (
             <>
               <div className="flex items-center gap-3 border-b border-ink-100 bg-white px-4 py-3">
+                <button
+                  onClick={() => setActiveId(null)}
+                  className="-ml-1.5 shrink-0 rounded-md p-1 text-ink-500 hover:bg-ink-50 md:hidden"
+                  aria-label="Back to conversations"
+                >
+                  <ChevronLeft size={20} />
+                </button>
                 <Avatar name={detail.customer.name || detail.customer.whatsapp_number} size="sm" />
-                <div>
-                  <div className="text-sm font-medium text-ink-900">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-ink-900">
                     {detail.customer.name || detail.customer.whatsapp_number}
                   </div>
                   <div className="flex items-center gap-1 text-xs text-ink-500">
@@ -200,9 +217,19 @@ export function InboxPage() {
                     {detail.customer.whatsapp_number_masked && (
                       <Lock size={11} className="text-ink-400" aria-label="Full number visible to Super Admin only" />
                     )}
-                    <span>· {detail.department}</span>
+                    <span className="hidden sm:inline">· {detail.department}</span>
                   </div>
                 </div>
+                {/* Customer info lives as a third column on desktop, but
+                    needs its own entry point on mobile since there's no
+                    room for a third column there. */}
+                <button
+                  onClick={() => setShowCustomerPanelMobile(true)}
+                  className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-ink-50 md:hidden"
+                  aria-label="View customer info"
+                >
+                  <Info size={18} />
+                </button>
               </div>
               <div className="relative flex-1 overflow-hidden">
                 <ChatBackground />
@@ -236,8 +263,34 @@ export function InboxPage() {
           )}
         </div>
 
-        <CustomerPanel customer={detail?.customer ?? null} />
+        {/* Third column on desktop only — see the Info button above for
+            how this same content is reached on mobile instead. */}
+        <div className="hidden md:block">
+          <CustomerPanel customer={detail?.customer ?? null} />
+        </div>
       </div>
+
+      {/* Mobile-only: customer info as a full-screen overlay, since
+          there's no room for a permanent third column on a narrow
+          screen. Reuses the exact same CustomerPanel desktop already
+          has, just presented differently. */}
+      {showCustomerPanelMobile && (
+        <div className="fixed inset-0 z-40 bg-white md:hidden">
+          <div className="flex h-12 items-center justify-between border-b border-ink-100 px-4">
+            <div className="text-sm font-medium text-ink-900">Customer info</div>
+            <button
+              onClick={() => setShowCustomerPanelMobile(false)}
+              className="rounded-md p-1 text-ink-500 hover:bg-ink-50"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="h-[calc(100%-3rem)] overflow-y-auto">
+            <CustomerPanel customer={detail?.customer ?? null} />
+          </div>
+        </div>
+      )}
 
       {showNewContact && (
         <NewContactModal

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MessageSquareText, Inbox as InboxIcon, UserPlus, Lock, ChevronLeft, Info, X } from 'lucide-react'
+import { MessageSquareText, Inbox as InboxIcon, UserPlus, Lock, ChevronLeft, Info, X, Filter, Check } from 'lucide-react'
 import { api } from '../api/client'
 import { Header } from '../components/Header'
 import { ConversationListItem } from '../components/ConversationListItem'
@@ -24,6 +24,7 @@ export function InboxPage() {
   const [detail, setDetail] = useState<ConversationDetail | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [showNewContact, setShowNewContact] = useState(false)
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
   const [showCustomerPanelMobile, setShowCustomerPanelMobile] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
@@ -153,18 +154,116 @@ export function InboxPage() {
     return parts.length > 0 ? parts.join(' · ') : null
   })()
 
+  // Toggling a boolean filter (mine/unassigned/unread) flips it on/off
+  // in place, keeping any OTHER active filters untouched — e.g. you can
+  // combine "Unread" with "Status: Open" at the same time.
+  function toggleBooleanFilter(key: 'mine' | 'unassigned' | 'unread') {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (next.get(key) === 'true') next.delete(key)
+      else next.set(key, 'true')
+      return next
+    })
+  }
+
+  function setStatusFilter(status: string | null) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (status) next.set('status', status)
+      else next.delete('status')
+      return next
+    })
+  }
+
+  const activeFilterCount = ['mine', 'unassigned', 'unread'].filter((k) => searchParams.get(k) === 'true').length
+    + (searchParams.get('status') ? 1 : 0)
+
   return (
     <>
       <Header
         title="Inbox"
         actions={
-          <button
-            onClick={() => setShowNewContact(true)}
-            className="flex items-center gap-1.5 rounded-md bg-signal-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-signal-500"
-          >
-            <UserPlus size={14} />
-            New contact
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setShowFilterMenu((v) => !v)}
+                className="relative z-40 flex items-center gap-1.5 rounded-md border border-ink-200 bg-white px-3 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:bg-ink-50"
+              >
+                <Filter size={14} />
+                Filter
+                {activeFilterCount > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-signal-600 px-1 text-[10px] font-medium text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {showFilterMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowFilterMenu(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-lg border border-ink-100 bg-white p-2 shadow-lg">
+                    {([
+                      ['unread', 'Unread'],
+                      ['unassigned', 'Unassigned'],
+                      ['mine', 'Assigned to me'],
+                    ] as const).map(([key, label]) => {
+                      const active = searchParams.get(key) === 'true'
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => toggleBooleanFilter(key)}
+                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-ink-50"
+                        >
+                          {label}
+                          {active && <Check size={14} className="text-signal-600" />}
+                        </button>
+                      )
+                    })}
+                    <div className="my-1.5 border-t border-ink-100" />
+                    <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-ink-400">Status</div>
+                    {[
+                      ['OPEN', 'Open'],
+                      ['PENDING', 'Pending'],
+                      ['RESOLVED', 'Resolved'],
+                      ['CLOSED', 'Closed'],
+                    ].map(([value, label]) => {
+                      const active = searchParams.get('status') === value
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => setStatusFilter(active ? null : value)}
+                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-ink-50"
+                        >
+                          {label}
+                          {active && <Check size={14} className="text-signal-600" />}
+                        </button>
+                      )
+                    })}
+                    {activeFilterCount > 0 && (
+                      <>
+                        <div className="my-1.5 border-t border-ink-100" />
+                        <button
+                          onClick={() => {
+                            setSearchParams({}, { replace: true })
+                            setShowFilterMenu(false)
+                          }}
+                          className="w-full rounded-md px-2 py-1.5 text-left text-sm text-ink-500 hover:bg-ink-50"
+                        >
+                          Clear all filters
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setShowNewContact(true)}
+              className="flex items-center gap-1.5 rounded-md bg-signal-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-signal-500"
+            >
+              <UserPlus size={14} />
+              New contact
+            </button>
+          </div>
         }
       />
       <div className="flex min-h-0 flex-1">

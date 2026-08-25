@@ -21,10 +21,19 @@ export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
     let socket: WebSocket | null = null
     let retryDelay = 1000
     let closedByClient = false
+    let waitingForTokenTimer: ReturnType<typeof setTimeout> | null = null
 
     function connect() {
       const token = tokenStore.getAccess()
-      if (!token) return
+      if (!token) {
+        // No token yet doesn't mean "never" — this hook can genuinely
+        // mount before login finishes (deliberately, so notifications
+        // are ready the instant auth completes, not just on whichever
+        // page happens to load next). Keep checking instead of giving
+        // up permanently after one failed attempt.
+        waitingForTokenTimer = setTimeout(connect, 1000)
+        return
+      }
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
       socket = new WebSocket(`${protocol}://${window.location.host}/ws/inbox/`)
 
@@ -48,6 +57,7 @@ export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
     connect()
     return () => {
       closedByClient = true
+      if (waitingForTokenTimer) clearTimeout(waitingForTokenTimer)
       socket?.close()
     }
   }, [])

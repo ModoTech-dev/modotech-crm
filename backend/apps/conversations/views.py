@@ -100,6 +100,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
             qs = qs.filter(
                 models_q_agent_scope(user)
             )
+        # Two extra query params beyond the simple exact-match fields
+        # filterset_fields already covers above — these need real
+        # lookups (isnull, greater-than) rather than a plain equality
+        # check, which is why they're handled explicitly here instead
+        # of just being added to that list. Used by the Dashboard's
+        # clickable tiles to link straight to a correctly filtered
+        # Inbox view for each stat.
+        if self.request.query_params.get("unassigned") == "true":
+            qs = qs.filter(assigned_agent__isnull=True)
+        if self.request.query_params.get("unread") == "true":
+            qs = qs.filter(unread_count__gt=0)
+        if self.request.query_params.get("mine") == "true":
+            # Deliberately a separate param name from assigned_agent —
+            # that one is already a django-filter field expecting a real
+            # UUID; reusing it for a "me" shortcut would collide with
+            # its own auto-generated exact-match filtering.
+            qs = qs.filter(assigned_agent=user)
         return qs
 
     def destroy(self, request, *args, **kwargs):
@@ -493,6 +510,15 @@ class InternalMessageViewSet(viewsets.GenericViewSet):
             {"id": str(u.id), "name": u.get_full_name() or u.email, "role": u.role}
             for u in colleagues
         ])
+
+    @action(detail=False, methods=["get"], url_path="unread-count")
+    def unread_count(self, request):
+        """A single global count, used for the Sidebar badge and to
+        decide whether an incoming message needs a toast notification —
+        deliberately cheap (one query, no thread grouping) since this
+        gets checked far more often than the full threads list."""
+        count = InternalMessage.objects.filter(recipient=request.user, read_at__isnull=True).count()
+        return Response({"count": count})
 
     @action(detail=False, methods=["get"])
     def threads(self, request):

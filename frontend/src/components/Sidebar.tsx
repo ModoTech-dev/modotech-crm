@@ -6,6 +6,7 @@ import {
   BarChart3, UserCog, Building2, Settings, LogOut, Wifi, Search, X, MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useInternalMessages } from '../context/InternalMessagesContext'
 import { Avatar } from './Avatar'
 import { GlobalSearchModal } from './GlobalSearchModal'
 import type { Role } from '../types'
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
 
 export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) {
   const { user, logout } = useAuth()
+  const { unreadCount } = useInternalMessages()
   const tier = roleTier(user?.role)
   const visibleItems = NAV_ITEMS.filter((item) => tier >= item.minTier)
   const [showSearch, setShowSearch] = useState(false)
@@ -110,7 +112,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; on
                   )}
                 />
                 <item.icon size={16} strokeWidth={2} className="shrink-0" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === '/messages' && unreadCount > 0 && (
+                  <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-signal-500 px-1 text-[10px] font-medium text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </>
             )}
           </NavLink>

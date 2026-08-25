@@ -30,8 +30,16 @@ export function InboxPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const loadConversations = useCallback(() => {
-    api.get('/conversations/').then((res) => setConversations(res.data.results ?? res.data))
-  }, [])
+    // Mirrors whatever filter params are currently in the URL — this is
+    // what makes the Dashboard's clickable tiles work: each one just
+    // navigates here with the right combination already set.
+    const params: Record<string, string> = {}
+    for (const key of ['status', 'unread', 'unassigned', 'mine']) {
+      const value = searchParams.get(key)
+      if (value) params[key] = value
+    }
+    api.get('/conversations/', { params }).then((res) => setConversations(res.data.results ?? res.data))
+  }, [searchParams])
 
   useEffect(() => {
     loadConversations()
@@ -131,6 +139,20 @@ export function InboxPage() {
     ? new Date(detail.service_window_expires_at) > new Date()
     : false
 
+  // A human-readable label for whatever filter combination is active in
+  // the URL right now — this is what makes it obvious the list has been
+  // replaced by a filtered view (e.g. from a Dashboard tile), not just
+  // silently changed, and gives a clear way back to the normal list.
+  const activeFilterLabel = (() => {
+    const parts: string[] = []
+    if (searchParams.get('mine') === 'true') parts.push('Assigned to me')
+    if (searchParams.get('unassigned') === 'true') parts.push('Unassigned')
+    if (searchParams.get('unread') === 'true') parts.push('Unread')
+    const status = searchParams.get('status')
+    if (status) parts.push(`Status: ${status.charAt(0) + status.slice(1).toLowerCase()}`)
+    return parts.length > 0 ? parts.join(' · ') : null
+  })()
+
   return (
     <>
       <Header
@@ -153,6 +175,17 @@ export function InboxPage() {
         <div
           className={`${activeId ? 'hidden md:block' : 'block'} w-full shrink-0 overflow-y-auto border-r border-ink-100 bg-white md:w-80`}
         >
+          {activeFilterLabel && (
+            <div className="flex items-center justify-between gap-2 border-b border-signal-100 bg-signal-100/40 px-4 py-2 text-xs">
+              <span className="font-medium text-signal-600">{activeFilterLabel}</span>
+              <button
+                onClick={() => setSearchParams({}, { replace: true })}
+                className="shrink-0 text-ink-500 underline hover:text-ink-700"
+              >
+                Clear
+              </button>
+            </div>
+          )}
           {conversations === null ? (
             <div className="space-y-4 p-4">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -169,8 +202,12 @@ export function InboxPage() {
             <div className="p-4">
               <EmptyState
                 icon={InboxIcon}
-                title="No conversations yet"
-                description="Incoming WhatsApp messages will appear here as soon as a customer writes in."
+                title={activeFilterLabel ? 'Nothing matches this filter' : 'No conversations yet'}
+                description={
+                  activeFilterLabel
+                    ? `No conversations currently match "${activeFilterLabel}".`
+                    : 'Incoming WhatsApp messages will appear here as soon as a customer writes in.'
+                }
               />
             </div>
           ) : (

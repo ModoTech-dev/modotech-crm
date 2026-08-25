@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { InternalMessagesProvider } from './context/InternalMessagesContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from './pages/LoginPage'
@@ -20,6 +21,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
+        <InternalMessagesProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route
@@ -42,6 +44,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
+        </InternalMessagesProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

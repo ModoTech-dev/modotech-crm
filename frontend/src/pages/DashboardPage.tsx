@@ -52,13 +52,32 @@ export function DashboardPage() {
           </div>
         ) : stats.scope === 'org' ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            <DashboardCard label="Total customers" value={stats.total_customers} icon={Users} tone="accent" />
-            <DashboardCard label="New leads" value={stats.new_leads} icon={UserPlus} tone="accent" />
-            <DashboardCard label="Open conversations" value={stats.open_conversations} icon={Inbox} tone="accent" />
-            <DashboardCard label="Pending conversations" value={stats.pending_conversations} icon={Clock} tone="warn" />
-            <DashboardCard label="Resolved conversations" value={stats.resolved_conversations} icon={CheckCircle2} />
-            <DashboardCard label="Unassigned conversations" value={stats.unassigned_conversations} icon={AlertCircle} tone="urgent" />
-            <DashboardCard label="Active agents" value={stats.active_agents} icon={UserCog} tone="accent" />
+            <button onClick={() => navigate('/customers')} className="text-left">
+              <DashboardCard label="Total customers" value={stats.total_customers} icon={Users} tone="accent" clickable />
+            </button>
+            <button onClick={() => navigate('/leads')} className="text-left">
+              <DashboardCard label="New leads" value={stats.new_leads} icon={UserPlus} tone="accent" clickable />
+            </button>
+            <button onClick={() => navigate('/inbox?status=OPEN')} className="text-left">
+              <DashboardCard label="Open conversations" value={stats.open_conversations} icon={Inbox} tone="accent" clickable />
+            </button>
+            <button onClick={() => navigate('/inbox?status=PENDING')} className="text-left">
+              <DashboardCard label="Pending conversations" value={stats.pending_conversations} icon={Clock} tone="warn" clickable />
+            </button>
+            <button onClick={() => navigate('/inbox?status=RESOLVED')} className="text-left">
+              <DashboardCard label="Resolved conversations" value={stats.resolved_conversations} icon={CheckCircle2} clickable />
+            </button>
+            <button onClick={() => navigate('/inbox?unassigned=true')} className="text-left">
+              <DashboardCard label="Unassigned conversations" value={stats.unassigned_conversations} icon={AlertCircle} tone="urgent" clickable />
+            </button>
+            <button onClick={() => navigate('/agents')} className="text-left">
+              <DashboardCard label="Active agents" value={stats.active_agents} icon={UserCog} tone="accent" clickable />
+            </button>
+            {/* These two are message-level counts, not conversation-level
+                — there's no filtered list view that precisely represents
+                "individual messages sent/received today" the way the
+                other tiles map onto a real Inbox filter, so left as
+                plain stats rather than forcing an imprecise link. */}
             <DashboardCard label="Today's incoming" value={stats.todays_incoming_messages} icon={ArrowDownToLine} tone="accent" />
             <DashboardCard label="Today's outgoing" value={stats.todays_outgoing_messages} icon={ArrowUpFromLine} tone="accent" />
           </div>
@@ -66,16 +85,18 @@ export function DashboardPage() {
           <>
             <p className="mb-4 text-sm text-ink-500">Your work, at a glance. Head to Inbox to dig into any of these.</p>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              <button onClick={() => navigate('/inbox')} className="text-left">
-                <DashboardCard label="My open conversations" value={stats.my_open_conversations} icon={Inbox} tone="accent" />
+              <button onClick={() => navigate('/inbox?mine=true&status=OPEN')} className="text-left">
+                <DashboardCard label="My open conversations" value={stats.my_open_conversations} icon={Inbox} tone="accent" clickable />
               </button>
-              <button onClick={() => navigate('/inbox')} className="text-left">
-                <DashboardCard label="My pending" value={stats.my_pending_conversations} icon={Clock} tone="warn" />
+              <button onClick={() => navigate('/inbox?mine=true&status=PENDING')} className="text-left">
+                <DashboardCard label="My pending" value={stats.my_pending_conversations} icon={Clock} tone="warn" clickable />
               </button>
-              <button onClick={() => navigate('/inbox')} className="text-left">
-                <DashboardCard label="My unread" value={stats.my_unread_conversations} icon={MailWarning} tone="urgent" />
+              <button onClick={() => navigate('/inbox?mine=true&unread=true')} className="text-left">
+                <DashboardCard label="My unread" value={stats.my_unread_conversations} icon={MailWarning} tone="urgent" clickable />
               </button>
-              <DashboardCard label="My resolved" value={stats.my_resolved_conversations} icon={CheckCircle2} tone="accent" />
+              <button onClick={() => navigate('/inbox?mine=true&status=RESOLVED')} className="text-left">
+                <DashboardCard label="My resolved" value={stats.my_resolved_conversations} icon={CheckCircle2} tone="accent" clickable />
+              </button>
               <DashboardCard label="Messages sent today" value={stats.my_messages_sent_today} icon={Send} tone="accent" />
             </div>
           </>

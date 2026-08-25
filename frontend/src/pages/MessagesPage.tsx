@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MessageCircle, Send, Megaphone, X, Link2, Search, UserPlus, Paperclip, FileText, Download } from 'lucide-react'
 import { api } from '../api/client'
 import { Header } from '../components/Header'
@@ -6,15 +7,16 @@ import { Avatar } from '../components/Avatar'
 import { EmptyState } from '../components/EmptyState'
 import { useAuth } from '../context/AuthContext'
 import { useOpenCustomerChat } from '../hooks/useOpenCustomerChat'
-import { useInboxSocket, type InboxEvent } from '../hooks/useInboxSocket'
+import { useInternalMessages } from '../context/InternalMessagesContext'
 import { useToast } from '../context/ToastContext'
 import type { Colleague, InternalMessage, MessageThread } from '../types'
 
 export function MessagesPage() {
   const { user } = useAuth()
-  const { showToast } = useToast()
   const openCustomerChat = useOpenCustomerChat()
+  const { setActiveThreadUserId, onIncomingMessage, refreshUnreadCount } = useInternalMessages()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [threads, setThreads] = useState<MessageThread[] | null>(null)
   const [colleagues, setColleagues] = useState<Colleague[]>([])
@@ -41,11 +43,36 @@ export function MessagesPage() {
     api.get('/internal-messages/colleagues/').then((res) => setColleagues(res.data))
   }, [])
 
+  // Deep-links from a toast notification's click, or anywhere else
+  // that wants to jump straight into a specific person's thread.
+  useEffect(() => {
+    const target = searchParams.get('with')
+    if (target) {
+      setActiveUserId(target)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('with')
+        return next
+      }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Tells the global notification provider which thread we're actively
+  // looking at, so an incoming message from THIS person gets appended
+  // directly here instead of also popping a redundant toast — and
+  // clears it again when we leave, so notifications resume normally.
+  useEffect(() => {
+    setActiveThreadUserId(activeUserId)
+    return () => setActiveThreadUserId(null)
+  }, [activeUserId, setActiveThreadUserId])
+
   useEffect(() => {
     if (!activeUserId) return
     api.get(`/internal-messages/with-user/${activeUserId}/`).then((res) => {
       setMessages(res.data)
       loadThreads() // refresh unread counts now that we've read this thread
+      refreshUnreadCount() // keep the Sidebar badge in sync too
     })
   }, [activeUserId])
 
@@ -53,18 +80,18 @@ export function MessagesPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [messages])
 
-  useInboxSocket((event: InboxEvent) => {
-    if (event.event !== 'internal_message') return
-    const msg = event.message as InternalMessage
-    loadThreads()
-    if (msg.sender === activeUserId) {
+  // Live updates for the currently-open thread, delivered through the
+  // one shared connection the whole app uses — not a second socket of
+  // our own just for this page.
+  useEffect(() => {
+    return onIncomingMessage((msg) => {
+      if (msg.sender !== activeUserId) return
       setMessages((prev) => [...prev, msg])
+      loadThreads()
       api.get(`/internal-messages/with-user/${activeUserId}/`) // marks it read since we're actively viewing
-    } else {
-      const senderName = msg.sender_name || 'Someone'
-      showToast(msg.content, { variant: 'message', title: senderName, durationMs: 6000, onClick: () => setActiveUserId(msg.sender) })
-    }
-  })
+      refreshUnreadCount()
+    })
+  }, [activeUserId, onIncomingMessage])
 
   useEffect(() => {
     if (customerQuery.trim().length < 2) {

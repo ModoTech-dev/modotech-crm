@@ -153,6 +153,20 @@ CHANNEL_LAYERS = {
     }
 }
 
+# Without this, Django defaults to LocMemCache — per-process, in-memory
+# only. That's fine for a single dev server, but breaks anything that
+# needs state shared across multiple worker processes, like tracking
+# which agents are currently viewing a conversation: two agents landing
+# on different worker processes would each see an empty, wrong viewer
+# list for the other. Reuses the same Redis instance Channels already
+# depends on, rather than standing up a separate cache backend.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
 # ---------------------------------------------------------------------------
 # Celery
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ import { tokenStore } from '../api/client'
 
 export interface InboxEvent {
   type: 'conversation.event'
-  event: 'new_message' | 'conversation_created' | 'conversation_updated' | 'conversation_assigned' | 'notification' | 'internal_message'
+  event: 'new_message' | 'conversation_created' | 'conversation_updated' | 'conversation_assigned' | 'notification' | 'internal_message' | 'conversation_viewers'
   conversation_id?: string
   [key: string]: unknown
 }
@@ -12,10 +12,15 @@ export interface InboxEvent {
  * Opens one WebSocket per logged-in agent (see apps/conversations/consumers.py).
  * Reconnects with backoff on drop — a shared inbox can't afford to silently
  * stop receiving new-message pushes.
+ *
+ * Returns a `send` function so callers can also talk back over the same
+ * connection (e.g. join_conversation/leave_conversation for presence),
+ * rather than this being receive-only.
  */
 export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
   const onEventRef = useRef(onEvent)
   onEventRef.current = onEvent
+  const socketRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     let socket: WebSocket | null = null
@@ -39,6 +44,7 @@ export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
       // WebSocket handshake, so the access token travels as a query
       // param instead — read server-side by JWTAuthMiddleware.
       socket = new WebSocket(`${protocol}://${window.location.host}/ws/inbox/?token=${encodeURIComponent(token)}`)
+      socketRef.current = socket
 
       socket.onmessage = (msg) => {
         try {
@@ -62,6 +68,16 @@ export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
       closedByClient = true
       if (waitingForTokenTimer) clearTimeout(waitingForTokenTimer)
       socket?.close()
+      socketRef.current = null
     }
   }, [])
+
+  function send(action: string, conversationId: string) {
+    const socket = socketRef.current
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ action, conversation_id: conversationId }))
+    }
+  }
+
+  return { send }
 }

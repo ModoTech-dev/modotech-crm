@@ -16,9 +16,11 @@ import { ChatBackground } from '../components/ChatBackground'
 import { isSameDay } from '../utils/dates'
 import { useInboxSocket, type InboxEvent } from '../hooks/useInboxSocket'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 import type { ConversationDetail, ConversationListItem as ConversationListItemType, Message } from '../types'
 
 export function InboxPage() {
+  const { user } = useAuth()
   const [conversations, setConversations] = useState<ConversationListItemType[] | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ConversationDetail | null>(null)
@@ -62,25 +64,14 @@ export function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  useEffect(() => {
-    if (!activeId) return
-    api.get<ConversationDetail>(`/conversations/${activeId}/`).then((res) => setDetail(res.data))
-    api.get(`/conversations/${activeId}/messages/`).then((res) => setMessages(res.data))
+  const [viewers, setViewers] = useState<{ user_id: string; name: string }[]>([])
 
-    // Opening a conversation marks it read — clear the unread badge both
-    // locally (instant) and on the backend (so it stays cleared on
-    // refresh, and other agents see it too, since unread is shared).
-    api.post(`/conversations/${activeId}/mark-read/`).catch(() => {})
-    setConversations((prev) =>
-      prev ? prev.map((c) => (c.id === activeId ? { ...c, unread_count: 0 } : c)) : prev
-    )
-  }, [activeId])
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [messages])
-
-  useInboxSocket((event: InboxEvent) => {
+  const { send } = useInboxSocket((event: InboxEvent) => {
+    if (event.event === 'conversation_viewers' && event.conversation_id === activeId) {
+      const others = (event.viewers as { user_id: string; name: string }[]).filter((v) => v.user_id !== user?.id)
+      setViewers(others)
+      return
+    }
     if (event.event === 'new_message' || event.event === 'conversation_updated' || event.event === 'conversation_created') {
       loadConversations()
 
@@ -106,6 +97,36 @@ export function InboxPage() {
       }
     }
   })
+
+  useEffect(() => {
+    if (!activeId) return
+    api.get<ConversationDetail>(`/conversations/${activeId}/`).then((res) => setDetail(res.data))
+    api.get(`/conversations/${activeId}/messages/`).then((res) => setMessages(res.data))
+
+    // Opening a conversation marks it read — clear the unread badge both
+    // locally (instant) and on the backend (so it stays cleared on
+    // refresh, and other agents see it too, since unread is shared).
+    api.post(`/conversations/${activeId}/mark-read/`).catch(() => {})
+    setConversations((prev) =>
+      prev ? prev.map((c) => (c.id === activeId ? { ...c, unread_count: 0 } : c)) : prev
+    )
+  }, [activeId])
+
+  // Announces presence to everyone else who might open this same
+  // conversation — a shared inbox means two agents can land on the same
+  // customer without either knowing, and re-asking something a
+  // colleague just covered reads as sloppy, not just redundant.
+  useEffect(() => {
+    setViewers([])
+    if (!activeId) return
+    send('join_conversation', activeId)
+    return () => send('leave_conversation', activeId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+  }, [messages])
 
   async function handleSend(content: string) {
     if (!activeId) return
@@ -367,6 +388,17 @@ export function InboxPage() {
                   <Info size={18} />
                 </button>
               </div>
+              {viewers.length > 0 && (
+                <div className="flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  </span>
+                  {viewers.length === 1 && `👋 ${viewers[0].name} is already here — no need to double up`}
+                  {viewers.length === 2 && `👋 ${viewers[0].name} and ${viewers[1].name} are already on this one`}
+                  {viewers.length > 2 && `👋 ${viewers[0].name}, ${viewers[1].name} and ${viewers.length - 2} others are already on this one`}
+                </div>
+              )}
               <div className="relative flex-1 overflow-hidden">
                 <ChatBackground />
                 <div ref={scrollRef} className="relative h-full space-y-2 overflow-y-auto p-4">

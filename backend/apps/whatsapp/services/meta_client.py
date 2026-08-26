@@ -189,11 +189,15 @@ class WhatsAppClient:
           Facebook's own infrastructure, expecting Meta's own auth
           scheme). Per docs.360dialog.com, you instead re-request the
           same file — using the mid/ext/hash query parameters already
-          present in that returned URL — against 360dialog's own proxied
-          endpoint (waba-v2.360dialog.io/whatsapp_business/attachments/),
-          which is authenticated with your D360-API-KEY like everything
-          else. This was the actual cause of inbound attachments not
-          appearing in the CRM until this fix.
+          present in that returned URL, PLUS a required source=getMedia
+          parameter (part of 360dialog's documented endpoint template
+          itself, not optional — omitting it returns a 401 Unauthorized
+          even with a correct API key, which is exactly what happened
+          here until this was caught and fixed) — against 360dialog's
+          own proxied endpoint (waba-v2.360dialog.io/whatsapp_business/
+          attachments/), authenticated with your D360-API-KEY like
+          everything else. This was the actual cause of inbound
+          attachments not appearing in the CRM until this fix.
         """
         meta_resp = requests.get(f"{self.base_url}/{media_id}", headers=self._headers, timeout=15)
         meta_resp.raise_for_status()
@@ -213,7 +217,7 @@ class WhatsAppClient:
                 )
             download_url = (
                 f"{self.base_url}/whatsapp_business/attachments/"
-                f"?mid={mid}&ext={ext}&hash={file_hash}"
+                f"?mid={mid}&source=getMedia&ext={ext}&hash={file_hash}"
             )
         else:
             download_url = media_url

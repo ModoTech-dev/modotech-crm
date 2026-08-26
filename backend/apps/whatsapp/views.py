@@ -46,6 +46,12 @@ class WhatsAppWebhookView(APIView):
         except ValueError:
             return Response(status=400)
 
+        # TEMPORARY — diagnosing exactly how a "customer replied to your
+        # WhatsApp Status" shows up in a real payload, since Meta's public
+        # docs don't confirm this clearly enough to build against safely.
+        # Remove this once that's confirmed.
+        logger.info("RAW WEBHOOK PAYLOAD FOR STATUS-REPLY DIAGNOSIS: %s", json.dumps(payload))
+
         process_webhook_event.delay(payload)
         return Response(status=200)
 

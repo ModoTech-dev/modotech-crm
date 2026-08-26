@@ -101,7 +101,7 @@ def _process_messages(value: dict):
                 if media_id:
                     try:
                         raw_bytes, mime_type = get_whatsapp_client().download_media(media_id)
-                        media_path = save_media(f"{msg['id']}", raw_bytes)
+                        media_path = save_media(_media_filename(msg, msg_type, msg['id']), raw_bytes)
                     except Exception:
                         logger.exception("Failed to download WhatsApp media %s", media_id)
 
@@ -203,7 +203,7 @@ def _process_message_echoes(value: dict):
                 if media_id:
                     try:
                         raw_bytes, mime_type = get_whatsapp_client().download_media(media_id)
-                        media_path = save_media(f"{echo['id']}", raw_bytes)
+                        media_path = save_media(_media_filename(echo, msg_type, echo['id']), raw_bytes)
                     except Exception:
                         logger.exception("Failed to download WhatsApp media %s (phone echo)", media_id)
 
@@ -234,6 +234,20 @@ def _process_message_echoes(value: dict):
         push_conversation_update(conversation, event="conversation_created" if is_new_conversation else "conversation_updated")
 
 
+def _media_filename(payload: dict, msg_type: str, fallback_id: str) -> str:
+    """
+    Preserves the ORIGINAL filename (with its real extension) for
+    documents specifically — without this, a shared PDF got saved with
+    no extension at all, meaning a browser had no way to recognize it
+    as a PDF when actually trying to open the download.
+    """
+    if msg_type == "DOCUMENT":
+        original_name = payload.get("document", {}).get("filename")
+        if original_name:
+            return f"{fallback_id}_{original_name}"
+    return fallback_id
+
+
 def _extract_text(msg: dict) -> str:
     msg_type = msg["type"]
     if msg_type == "text":
@@ -244,6 +258,15 @@ def _extract_text(msg: dict) -> str:
     if msg_type == "location":
         loc = msg["location"]
         return loc.get("name") or "Shared a location"
+    if msg_type == "document":
+        # Most documents arrive with no caption at all — a bare PDF, no
+        # typed message alongside it. Falling back to "" here (as the
+        # generic path below does) meant agents saw nothing meaningful
+        # and the actual saved file had no real name either. filename
+        # is the one field WhatsApp always sends for a document, so use
+        # it whenever there's no caption to show instead.
+        document = msg["document"]
+        return document.get("caption") or document.get("filename") or "Shared a document"
     return msg.get(msg_type, {}).get("caption", "") or ""
 
 

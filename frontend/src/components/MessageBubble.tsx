@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { MapPin, ExternalLink, FileText, Download, Trash2, Ban, Smartphone } from 'lucide-react'
+import { MapPin, ExternalLink, FileText, Download, Trash2, Ban, Smartphone, CircleDot } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../api/client'
 import type { Message } from '../types'
@@ -24,6 +24,7 @@ export function MessageBubble({
     typeof message.metadata?.latitude === 'number' &&
     typeof message.metadata?.longitude === 'number'
   const hasMedia = ['IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT'].includes(message.message_type) && message.media_url
+  const repliedToStatus = message.metadata?.replied_to_status === true
 
   async function handleDelete() {
     setDeleting(true)
@@ -88,6 +89,18 @@ export function MessageBubble({
           <div className="mb-1 flex items-center gap-1 text-[11px] font-medium text-violet-500">
             <Smartphone size={11} />
             Sent from phone — not through the CRM
+          </div>
+        )}
+        {repliedToStatus && (
+          <div
+            className={clsx(
+              'mb-1 flex items-center gap-1 text-[11px] font-medium',
+              fromCustomer ? 'text-amber-500' : 'text-amber-100'
+            )}
+            title="This customer replied directly to one of your WhatsApp Status updates — likely reaching out because it caught their interest."
+          >
+            <CircleDot size={11} />
+            Replied to your Status
           </div>
         )}
         {hasLocation ? (

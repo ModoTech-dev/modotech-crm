@@ -42,6 +42,7 @@ def _process_messages(value: dict):
     from django.utils import timezone
 
     contacts = {c["wa_id"]: c.get("profile", {}).get("name", "") for c in value.get("contacts", [])}
+    business_number = value.get("metadata", {}).get("display_phone_number", "")
 
     for msg in value.get("messages", []):
         wa_id = msg["from"]
@@ -118,6 +119,22 @@ def _process_messages(value: dict):
                     "name": loc.get("name", ""),
                     "address": loc.get("address", ""),
                 }
+
+            # Detected from real webhook payloads, not officially
+            # documented by Meta: a reply to one of your WhatsApp Status
+            # updates arrives with context.from set to your own business
+            # number but — unlike a reply to an actual message — WITHOUT
+            # a context.id, since a Status isn't a regular message with
+            # its own id in that system. A reply to a specific message
+            # always includes both fields; this is how the two are told
+            # apart. Surfacing this matters commercially: a customer
+            # reaching out because a Status caught their interest is a
+            # meaningfully different, often higher-intent conversation
+            # than someone messaging cold.
+            context = msg.get("context", {})
+            replied_to_status = bool(business_number) and context.get("from") == business_number and "id" not in context
+            if replied_to_status:
+                location_metadata["replied_to_status"] = True
 
             message = Message.objects.create(
                 conversation=conversation,

@@ -126,6 +126,7 @@ export interface Message {
     longitude?: number
     name?: string
     address?: string
+    replied_to_status?: boolean
     [key: string]: unknown
   }
   status: 'RECEIVED' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'

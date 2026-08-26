@@ -35,7 +35,10 @@ export function useInboxSocket(onEvent: (event: InboxEvent) => void) {
         return
       }
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      socket = new WebSocket(`${protocol}://${window.location.host}/ws/inbox/`)
+      // Browsers can't attach a custom Authorization header to a raw
+      // WebSocket handshake, so the access token travels as a query
+      // param instead — read server-side by JWTAuthMiddleware.
+      socket = new WebSocket(`${protocol}://${window.location.host}/ws/inbox/?token=${encodeURIComponent(token)}`)
 
       socket.onmessage = (msg) => {
         try {

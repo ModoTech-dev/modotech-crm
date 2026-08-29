@@ -151,13 +151,8 @@ class WhatsAppClient:
         originates from your own system (an agent's upload) rather than
         one already hosted at a public URL.
 
-        NOTE for 360dialog: this endpoint path (POST {base}/media) is
-        inferred from the same pattern confirmed for /messages (no
-        phone_number_id in the path), not independently verified against
-        current 360dialog docs. If this fails, check docs.360dialog.com
-        for the exact upload path before assuming something else is
-        wrong — this is the one part of the 360dialog integration built
-        on a reasonable guess rather than confirmed documentation.
+        Endpoint confirmed directly against docs.360dialog.com:
+        POST https://waba-v2.360dialog.io/media
         """
         if not self.access_token:
             raise WhatsAppAPIError("WhatsApp API is not configured (missing access token / API key).")

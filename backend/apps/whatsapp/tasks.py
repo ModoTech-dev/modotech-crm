@@ -7,7 +7,6 @@ failure instead of dropping the event.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone as dt_timezone
 
 from celery import shared_task
@@ -252,32 +251,21 @@ def _process_message_echoes(value: dict):
         push_conversation_update(conversation, event="conversation_created" if is_new_conversation else "conversation_updated")
 
 
-def _sanitize_filename_component(value: str) -> str:
-    """
-    WhatsApp message IDs are base64-encoded and can contain '=', '/',
-    '+' — harmless inside a JSON payload, but '=' specifically breaks
-    once it ends up sitting in a URL PATH rather than a query string
-    (where it's normal and expected). A customer's own filename could,
-    in principle, carry unusual characters too. Replacing anything
-    that isn't alphanumeric/dot/hyphen/underscore keeps the result
-    safe as both a filesystem name and a URL path segment.
-    """
-    return re.sub(r"[^A-Za-z0-9._-]", "_", value)
-
-
 def _media_filename(payload: dict, msg_type: str, fallback_id: str) -> str:
     """
     Preserves the ORIGINAL filename (with its real extension) for
     documents specifically — without this, a shared PDF got saved with
     no extension at all, meaning a browser had no way to recognize it
-    as a PDF when actually trying to open the download.
+    as a PDF when actually trying to open the download. Sanitizing
+    against unsafe characters (WhatsApp message IDs are base64 and can
+    contain '=', '/', '+') happens centrally inside save_media() itself
+    now, not here — this function only decides WHAT name to use.
     """
-    safe_id = _sanitize_filename_component(fallback_id)
     if msg_type == "DOCUMENT":
         original_name = payload.get("document", {}).get("filename")
         if original_name:
-            return f"{safe_id}_{_sanitize_filename_component(original_name)}"
-    return safe_id
+            return f"{fallback_id}_{original_name}"
+    return fallback_id
 
 
 def _extract_text(msg: dict) -> str:

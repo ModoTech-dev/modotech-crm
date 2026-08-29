@@ -42,6 +42,12 @@ echo "    internal address, and nginx won't notice that on its own until its DNS
 echo "    This is exactly the gap that's caused login failures right after past deploys."
 docker compose restart nginx
 
+echo "==> Fixing /app/media ownership — Docker volumes default to root-owned, but the app"
+echo "    runs as the unprivileged appuser. Without this, every inbound customer attachment"
+echo "    (images, PDFs, anything shared over WhatsApp) silently fails to save. Safe to run"
+echo "    every time even when already correct."
+docker compose run --rm -u root backend chown -R appuser:appuser /app/media || true
+
 echo "==> Waiting for backend to become healthy (internal check)..."
 for i in $(seq 1 30); do
     if docker compose exec -T backend python manage.py check >/dev/null 2>&1; then

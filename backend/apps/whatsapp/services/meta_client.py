@@ -188,16 +188,18 @@ class WhatsAppClient:
         - 360dialog: that CDN URL does NOT accept a D360-API-KEY (it's
           Facebook's own infrastructure, expecting Meta's own auth
           scheme). Per docs.360dialog.com, you instead re-request the
-          same file — using the mid/ext/hash query parameters already
-          present in that returned URL, PLUS a required source=getMedia
-          parameter (part of 360dialog's documented endpoint template
-          itself, not optional — omitting it returns a 401 Unauthorized
-          even with a correct API key, which is exactly what happened
-          here until this was caught and fixed) — against 360dialog's
+          same file — using the mid/ext/hash/source query parameters
+          already present in that returned URL — against 360dialog's
           own proxied endpoint (waba-v2.360dialog.io/whatsapp_business/
           attachments/), authenticated with your D360-API-KEY like
-          everything else. This was the actual cause of inbound
-          attachments not appearing in the CRM until this fix.
+          everything else. `source` matters and genuinely varies: a
+          regular customer message uses getMedia, but media sent from
+          the linked phone (smb_message_echoes) uses webhook instead —
+          confirmed from real captured payloads, not assumed. Reading
+          it from the URL rather than hardcoding either value is what
+          makes both paths work; hardcoding one silently breaks the
+          other. This was the actual cause of inbound attachments not
+          appearing in the CRM until this fix.
         """
         meta_resp = requests.get(f"{self.base_url}/{media_id}", headers=self._headers, timeout=15)
         meta_resp.raise_for_status()
@@ -211,13 +213,21 @@ class WhatsAppClient:
             mid = query.get("mid", [None])[0]
             ext = query.get("ext", [None])[0]
             file_hash = query.get("hash", [None])[0]
-            if not (mid and ext and file_hash):
+            # The 'source' value genuinely differs by context — a
+            # regular customer message uses getMedia, but a message
+            # sent from the linked phone (smb_message_echoes) uses
+            # webhook instead, confirmed from real captured payloads.
+            # Hardcoding either one breaks the other; the original URL
+            # already carries the correct value for whichever case this
+            # actually is, so read it from there rather than assume.
+            source = query.get("source", [None])[0]
+            if not (mid and ext and file_hash and source):
                 raise WhatsAppAPIError(
-                    f"Couldn't parse mid/ext/hash from 360dialog's media URL: {media_url}"
+                    f"Couldn't parse mid/source/ext/hash from 360dialog's media URL: {media_url}"
                 )
             download_url = (
                 f"{self.base_url}/whatsapp_business/attachments/"
-                f"?mid={mid}&source=getMedia&ext={ext}&hash={file_hash}"
+                f"?mid={mid}&source={source}&ext={ext}&hash={file_hash}"
             )
         else:
             download_url = media_url
